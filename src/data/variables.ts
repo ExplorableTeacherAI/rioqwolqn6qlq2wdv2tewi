@@ -81,9 +81,141 @@ export interface VariableDefinition {
  *    { defaultValue: { x: 5, y: 10 }, type: 'object', schema: '{ x: number, y: number }' }
  */
 export const variableDefinitions: Record<string, VariableDefinition> = {
-    // ========================================
-    // ADD YOUR VARIABLES HERE
-    // ========================================
+    // ─────────────────────────────────────────
+    // SECTION 2 — The Undo Machine
+    // ─────────────────────────────────────────
+    undoCoefficient: {
+        defaultValue: 3,
+        type: 'number',
+        label: 'Coefficient dial',
+        description: 'The number in front of x in the function fed to the machine',
+        min: 1,
+        max: 6,
+        step: 1,
+        color: '#62D0AD',
+    },
+    undoPower: {
+        defaultValue: 2,
+        type: 'number',
+        label: 'Power dial',
+        description: 'The power of x in the function fed to the machine',
+        min: 1,
+        max: 5,
+        step: 1,
+        color: '#62D0AD',
+    },
+    answer_undo_reverse: {
+        defaultValue: '',
+        type: 'text',
+        label: 'Reverse the machine answer',
+        description: 'Student answer for the function that differentiates to 5x^4',
+        placeholder: '???',
+        correctAnswer: ['x^5', 'x⁵', 'x5'],
+        color: '#8E90F5',
+    },
+
+    // ─────────────────────────────────────────
+    // SECTION 3 — Add One, Then Divide
+    // ─────────────────────────────────────────
+    ladderStartPower: {
+        defaultValue: 3,
+        type: 'number',
+        label: 'Given power',
+        description: 'The power of the term being integrated',
+        min: 1,
+        max: 5,
+        step: 1,
+        color: '#8E90F5',
+    },
+    ladderChosenPower: {
+        defaultValue: 5,
+        type: 'number',
+        label: 'Chosen power',
+        description: 'The power the student places on the ladder for the answer',
+        min: 1,
+        max: 6,
+        step: 1,
+        color: '#62D0AD',
+    },
+    ladderDivisor: {
+        defaultValue: 1,
+        type: 'number',
+        label: 'Divide by',
+        description: 'The number the student divides the answer by',
+        min: 1,
+        max: 6,
+        step: 1,
+        color: '#62D0AD',
+    },
+    answer_ladder_power: {
+        defaultValue: '',
+        type: 'text',
+        label: 'Integral of x^5 power',
+        description: 'Student answer for the new power when integrating x to the fifth',
+        placeholder: '???',
+        correctAnswer: ['6', 'six'],
+        color: '#8E90F5',
+    },
+    answer_ladder_divisor: {
+        defaultValue: '',
+        type: 'text',
+        label: 'Integral of x^5 divisor',
+        description: 'Student answer for the number you divide by when integrating x to the fifth',
+        placeholder: '???',
+        correctAnswer: ['6', 'six'],
+        color: '#8E90F5',
+    },
+
+    // ─────────────────────────────────────────
+    // SECTION 4 — The Family of Curves
+    // ─────────────────────────────────────────
+    familyShift: {
+        defaultValue: 0,
+        type: 'number',
+        label: 'Constant C',
+        description: 'How far the curve y = x^2 + C is shifted up or down',
+        min: -2,
+        max: 3,
+        step: 0.5,
+        color: '#62D0AD',
+    },
+    familyX: {
+        defaultValue: 1,
+        type: 'number',
+        label: 'x position',
+        description: 'Where along the curve the steepness is measured',
+        min: -2,
+        max: 2,
+        step: 0.1,
+        color: '#8E90F5',
+    },
+    familyHighlight: {
+        defaultValue: '',
+        type: 'text',
+        label: 'Family view highlight',
+        description: 'Which quantity is highlighted across the curve and the steepness graph',
+        color: '#62D0AD',
+        bgColor: 'rgba(98, 208, 173, 0.22)',
+    },
+    answer_family_constant: {
+        defaultValue: '',
+        type: 'select',
+        label: 'Who integrated correctly',
+        description: 'Student answer for the two integrals of 2x question',
+        placeholder: '???',
+        correctAnswer: 'both are right',
+        options: ['only Maya is right', 'only Theo is right', 'both are right'],
+        color: '#8E90F5',
+    },
+    answer_family_origin: {
+        defaultValue: '',
+        type: 'text',
+        label: 'Constant through the origin',
+        description: 'Student answer for the value of C when the curve passes through the origin',
+        placeholder: '???',
+        correctAnswer: ['0', 'zero'],
+        color: '#8E90F5',
+    },
 
     // Uncomment and modify these examples for your lesson:
 

@@ -84,6 +84,16 @@ initializeVariableColors(variableDefinitions);
  * check your .env file and set VITE_SHOW_EXAMPLES=false.
  */
 
+import { integrationIntroBlocks } from "./sections/integrationIntro";
+import { undoMachineBlocks } from "./sections/undoMachine";
+import { powerLadderBlocks } from "./sections/powerLadder";
+import { familyOfCurvesBlocks } from "./sections/familyOfCurves";
+import { integrationWrapUpBlocks } from "./sections/integrationWrapUp";
+
 export const blocks: ReactElement[] = [
-    // Start adding your blocks here!
+    ...integrationIntroBlocks,
+    ...undoMachineBlocks,
+    ...powerLadderBlocks,
+    ...familyOfCurvesBlocks,
+    ...integrationWrapUpBlocks,
 ];
