@@ -1,9 +1,10 @@
 /**
  * Section 3 — EXPLORE: "Add One, Then Divide"
  *
- * Goal/constraint paradigm: the student builds the integral of x^n by placing
- * a token on the power ladder and choosing the divisor, and the figure
- * differentiates their answer back live. Landing on the start term is the goal.
+ * Constructivist paradigm: the answer to an integral is an empty template with
+ * two boxes. The student drags number tiles into them and the panel
+ * differentiates whatever they assemble, so a wrong build is informative
+ * rather than punished.
  */
 
 import React, { useRef, useState, type ReactElement } from "react";
@@ -19,7 +20,7 @@ import {
 } from "@/components/atoms";
 import { Figure, FormulaBlock } from "@/components/molecules";
 import { useVar, useSetVar } from "@/stores";
-import { clamp, remap, useSpring, type Vec2 } from "@/lib/motion";
+import { useSpring, type Vec2 } from "@/lib/motion";
 import {
     clozePropsFromDefinition,
     getVariableInfo,
@@ -28,13 +29,8 @@ import {
 
 // ── Domain model ─────────────────────────────────────────────────────────────
 
-const MIN_RUNG = 1;
-const MAX_RUNG = 6;
-const MIN_DIVISOR = 1;
-const MAX_DIVISOR = 6;
 const DEFAULT_START = 3;
-const DEFAULT_CHOSEN = 5;
-const DEFAULT_DIVISOR = 1;
+const TILE_VALUES = [1, 2, 3, 4, 5, 6];
 
 const greatestCommonDivisor = (a: number, b: number): number =>
     b === 0 ? a : greatestCommonDivisor(b, a % b);
@@ -50,26 +46,24 @@ const formatRatio = (numerator: number, denominator: number): string => {
 // ── View constants ───────────────────────────────────────────────────────────
 
 const VIEW_WIDTH = 560;
-const VIEW_HEIGHT = 344;
+const VIEW_HEIGHT = 360;
 
-const GIVEN_X = 120;
-const TOKEN_X = 170;
-const RUNG_LEFT = 104;
-const RUNG_RIGHT = 186;
-const BOTTOM_RUNG_Y = 292;
-const RUNG_GAP = 46;
+const POWER_SLOT = { x: 412, y: 74, size: 32 };
+const DIVISOR_SLOT = { x: 404, y: 136, size: 32 };
+const FRACTION_BAR = { x1: 374, x2: 458, y: 124 };
 
-const DIAL_LEFT = 250;
-const DIAL_RIGHT = 500;
-const DIAL_Y = 306;
+const TILE_SIZE = 40;
+const TILE_Y = 262;
+const TILE_START_X = 100;
+const TILE_GAP = 76;
 
 const INK = "#334155";
 const INK_STRUCTURE = "#64748B";
 const INK_QUIET = "#CBD5E1";
-const ACCENT = "#62D0AD"; // what the student builds
-const GIVEN = "#8E90F5"; // the term they were given
+const ACCENT = "#62D0AD"; // what the student assembles
+const GIVEN = "#8E90F5"; // the term they were handed
 
-const yForRung = (rung: number) => BOTTOM_RUNG_Y - (rung - 1) * RUNG_GAP;
+const tileCentre = (index: number) => ({ x: TILE_START_X + index * TILE_GAP, y: TILE_Y + TILE_SIZE / 2 });
 
 const svgPointFromEvent = (event: React.PointerEvent, svg: SVGSVGElement | null): Vec2 => {
     if (!svg) return { x: 0, y: 0 };
@@ -79,6 +73,12 @@ const svgPointFromEvent = (event: React.PointerEvent, svg: SVGSVGElement | null)
         y: ((event.clientY - rect.top) / rect.height) * VIEW_HEIGHT,
     };
 };
+
+const isInsideSlot = (point: Vec2, slot: { x: number; y: number; size: number }) =>
+    point.x > slot.x - 18 &&
+    point.x < slot.x + slot.size + 18 &&
+    point.y > slot.y - 18 &&
+    point.y < slot.y + slot.size + 18;
 
 // ── Term rendering ───────────────────────────────────────────────────────────
 
@@ -97,7 +97,6 @@ function Term({
     fontSize: number;
     fill: string;
 }) {
-    const showCoefficient = coefficient !== undefined && coefficient !== "1";
     if (power === 0) {
         return (
             <text x={x} y={y} fontSize={fontSize} fill={fill} textAnchor="middle">
@@ -107,7 +106,7 @@ function Term({
     }
     return (
         <text x={x} y={y} fontSize={fontSize} fill={fill} textAnchor="middle">
-            {showCoefficient ? coefficient : ""}
+            {coefficient !== undefined && coefficient !== "1" ? coefficient : ""}
             <tspan fontStyle="italic">x</tspan>
             {power !== 1 ? (
                 <tspan dy={-fontSize * 0.42} fontSize={fontSize * 0.62}>
@@ -118,85 +117,79 @@ function Term({
     );
 }
 
-// ── The divide-by dial ───────────────────────────────────────────────────────
+// ── A number tile the student can pick up ────────────────────────────────────
 
-function DivisorDial({
+function NumberTile({
     value,
-    onChange,
+    index,
+    onDrop,
+    dragging,
+    onDragStart,
+    onDragMove,
+    onDragEnd,
 }: {
     value: number;
-    onChange: (next: number) => void;
+    index: number;
+    dragging: boolean;
+    onDrop: (point: Vec2, value: number) => void;
+    onDragStart: (value: number, point: Vec2) => void;
+    onDragMove: (point: Vec2) => void;
+    onDragEnd: () => void;
 }) {
-    const [dragging, setDragging] = useState(false);
     const [hovered, setHovered] = useState(false);
-    const draggingRef = useRef(false);
     const rectRef = useRef<SVGRectElement>(null);
+    const scale = useSpring(dragging || hovered ? 1.12 : 1, { stiffness: 400, damping: 26 });
+    const centre = tileCentre(index);
 
-    const knobX = useSpring(remap(value, MIN_DIVISOR, MAX_DIVISOR, DIAL_LEFT, DIAL_RIGHT), {
-        stiffness: 260,
-        damping: 24,
-    });
-    const knobScale = useSpring(dragging || hovered ? 1.15 : 1, { stiffness: 400, damping: 26 });
-
-    const updateFromEvent = (event: React.PointerEvent<SVGRectElement>) => {
-        const point = svgPointFromEvent(event, rectRef.current?.ownerSVGElement ?? null);
-        const raw = remap(point.x, DIAL_LEFT, DIAL_RIGHT, MIN_DIVISOR, MAX_DIVISOR);
-        onChange(clamp(Math.round(raw), MIN_DIVISOR, MAX_DIVISOR));
-    };
+    const pointFrom = (event: React.PointerEvent) =>
+        svgPointFromEvent(event, rectRef.current?.ownerSVGElement ?? null);
 
     return (
         <g>
-            <text x={DIAL_LEFT} y={DIAL_Y - 18} fontSize="11" fill={INK_STRUCTURE}>
-                divide by
-            </text>
-            <text
-                x={DIAL_RIGHT}
-                y={DIAL_Y - 18}
-                fontSize="12"
-                fill={ACCENT}
-                textAnchor="end"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-                {value}
-            </text>
-            <line
-                x1={DIAL_LEFT}
-                y1={DIAL_Y}
-                x2={DIAL_RIGHT}
-                y2={DIAL_Y}
-                stroke={INK_QUIET}
-                strokeWidth="4"
-                strokeLinecap="round"
-            />
-            <g transform={`translate(${knobX} ${DIAL_Y}) scale(${knobScale})`}>
-                <circle r="11" fill={ACCENT} filter="url(#power-ladder-shadow)" />
+            <g transform={`translate(${centre.x} ${centre.y}) scale(${scale})`} opacity={dragging ? 0.35 : 1}>
+                <rect
+                    x={-TILE_SIZE / 2}
+                    y={-TILE_SIZE / 2}
+                    width={TILE_SIZE}
+                    height={TILE_SIZE}
+                    rx="9"
+                    fill="#FFFFFF"
+                    stroke={INK_STRUCTURE}
+                    strokeWidth="1.5"
+                    filter="url(#tile-shadow)"
+                />
+                <text
+                    x="0"
+                    y="6"
+                    fontSize="18"
+                    fill={INK}
+                    textAnchor="middle"
+                    style={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                    {value}
+                </text>
             </g>
             <rect
                 ref={rectRef}
-                x={DIAL_LEFT - 22}
-                y={DIAL_Y - 20}
-                width={DIAL_RIGHT - DIAL_LEFT + 44}
-                height={40}
+                x={centre.x - TILE_SIZE / 2 - 6}
+                y={centre.y - TILE_SIZE / 2 - 6}
+                width={TILE_SIZE + 12}
+                height={TILE_SIZE + 12}
                 fill="transparent"
                 style={{ cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}
                 onPointerDown={(event) => {
                     event.currentTarget.setPointerCapture(event.pointerId);
-                    draggingRef.current = true;
-                    setDragging(true);
-                    updateFromEvent(event);
+                    onDragStart(value, pointFrom(event));
                 }}
                 onPointerMove={(event) => {
-                    if (!draggingRef.current) return;
-                    updateFromEvent(event);
+                    if (!dragging) return;
+                    onDragMove(pointFrom(event));
                 }}
-                onPointerUp={() => {
-                    draggingRef.current = false;
-                    setDragging(false);
+                onPointerUp={(event) => {
+                    if (dragging) onDrop(pointFrom(event), value);
+                    onDragEnd();
                 }}
-                onPointerCancel={() => {
-                    draggingRef.current = false;
-                    setDragging(false);
-                }}
+                onPointerCancel={onDragEnd}
                 onPointerEnter={() => setHovered(true)}
                 onPointerLeave={() => setHovered(false)}
             />
@@ -206,34 +199,61 @@ function DivisorDial({
 
 // ── The bespoke drawing ──────────────────────────────────────────────────────
 
-function PowerLadderDrawing() {
+function AnswerBuilderDrawing() {
     const setVar = useSetVar();
     const startPower = useVar<number>("ladderStartPower", DEFAULT_START);
-    const chosenPower = useVar<number>("ladderChosenPower", DEFAULT_CHOSEN);
-    const divisor = useVar<number>("ladderDivisor", DEFAULT_DIVISOR);
+    const powerBox = useVar<number>("assemblePower", 0);
+    const divisorBox = useVar<number>("assembleDivisor", 0);
 
-    const [dragging, setDragging] = useState(false);
-    const [hovered, setHovered] = useState(false);
-    const draggingRef = useRef(false);
+    const [drag, setDrag] = useState<{ value: number; x: number; y: number } | null>(null);
     const svgRef = useRef<SVGSVGElement>(null);
 
-    const tokenY = useSpring(yForRung(chosenPower), { stiffness: 260, damping: 24 });
-    const tokenScale = useSpring(dragging || hovered ? 1.15 : 1, { stiffness: 400, damping: 26 });
+    const bothFilled = powerBox > 0 && divisorBox > 0;
+    const checkPower = powerBox - 1;
+    const checkCoefficient = formatRatio(powerBox, divisorBox || 1);
+    const backAtStart = bothFilled && checkPower === startPower && powerBox === divisorBox;
 
-    // The model draws the view: differentiate the student's answer and compare.
-    const checkPower = chosenPower - 1;
-    const checkCoefficient = formatRatio(chosenPower, divisor);
-    const backAtStart = checkPower === startPower && chosenPower === divisor;
-
-    const handlePointerMove = (event: React.PointerEvent<SVGCircleElement>) => {
-        if (!draggingRef.current) return;
-        const point = svgPointFromEvent(event, svgRef.current);
-        const raw = remap(point.y, BOTTOM_RUNG_Y, yForRung(MAX_RUNG), MIN_RUNG, MAX_RUNG);
-        setVar("ladderChosenPower", clamp(Math.round(raw), MIN_RUNG, MAX_RUNG));
+    const handleDrop = (point: Vec2, value: number) => {
+        if (isInsideSlot(point, POWER_SLOT)) setVar("assemblePower", value);
+        else if (isInsideSlot(point, DIVISOR_SLOT)) setVar("assembleDivisor", value);
     };
 
-    const givenY = yForRung(startPower);
-    const chosenY = yForRung(chosenPower);
+    const renderSlot = (
+        slot: { x: number; y: number; size: number },
+        value: number,
+        varName: string,
+    ) => (
+        <g>
+            <rect
+                x={slot.x}
+                y={slot.y}
+                width={slot.size}
+                height={slot.size}
+                rx="7"
+                fill={value > 0 ? "rgba(98, 208, 173, 0.15)" : "#FFFFFF"}
+                stroke={ACCENT}
+                strokeWidth={value > 0 ? 2.5 : 1.5}
+                strokeDasharray={value > 0 ? undefined : "4 4"}
+                style={{ transition: "stroke-width 150ms ease", cursor: value > 0 ? "pointer" : "default" }}
+                onClick={() => {
+                    if (value > 0) setVar(varName, 0);
+                }}
+            />
+            {value > 0 ? (
+                <text
+                    x={slot.x + slot.size / 2}
+                    y={slot.y + slot.size / 2 + 7}
+                    fontSize="19"
+                    fill={ACCENT}
+                    textAnchor="middle"
+                    pointerEvents="none"
+                    style={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                    {value}
+                </text>
+            ) : null}
+        </g>
+    );
 
     return (
         <svg
@@ -241,157 +261,145 @@ function PowerLadderDrawing() {
             viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
             className="block w-full select-none"
             role="img"
-            aria-label="A ladder of powers of x with a draggable token, beside the student's answer and its derivative"
+            aria-label="An integral answer template with two empty boxes and a tray of draggable number tiles"
         >
             <defs>
-                <filter id="power-ladder-shadow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#0F172A" floodOpacity="0.25" />
+                <filter id="tile-shadow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#0F172A" floodOpacity="0.22" />
                 </filter>
             </defs>
 
-            {/* Column headers */}
-            <text x={GIVEN_X} y="34" fontSize="11" fill={GIVEN} textAnchor="middle">
-                given
+            {/* The term you were handed. */}
+            <text x="40" y="48" fontSize="11" fill={INK_STRUCTURE}>
+                you are integrating
             </text>
-            <text x={TOKEN_X} y="34" fontSize="11" fill={ACCENT} textAnchor="middle">
-                you
-            </text>
+            <Term x={140} y={112} power={startPower} fontSize={30} fill={GIVEN} />
 
-            {/* The ladder: one rung per power, labelled directly. */}
-            {[1, 2, 3, 4, 5, 6].map((rung) => (
-                <g key={rung}>
-                    <line
-                        x1={RUNG_LEFT}
-                        y1={yForRung(rung)}
-                        x2={RUNG_RIGHT}
-                        y2={yForRung(rung)}
-                        stroke={INK_QUIET}
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                    />
-                    <Term x={88} y={yForRung(rung) + 5} power={rung} fontSize={14} fill={INK} />
-                </g>
-            ))}
-
-            {/* The step from the given term to the chosen one. */}
-            <path
-                d={`M ${GIVEN_X + 12} ${givenY} Q ${(GIVEN_X + TOKEN_X) / 2} ${(givenY + chosenY) / 2 - 10} ${TOKEN_X - 14} ${chosenY}`}
-                fill="none"
-                stroke={INK_STRUCTURE}
-                strokeWidth="1.5"
-                strokeLinecap="round"
-            />
-
-            {/* The given term's marker. */}
-            <circle cx={GIVEN_X} cy={givenY} r="9" fill="#FFFFFF" stroke={GIVEN} strokeWidth="2.5" />
-
-            {/* The draggable token — the power the student chooses. */}
-            <g transform={`translate(${TOKEN_X} ${tokenY}) scale(${tokenScale})`}>
-                <circle r="11" fill={ACCENT} filter="url(#power-ladder-shadow)" />
-            </g>
-            <circle
-                cx={TOKEN_X}
-                cy={chosenY}
-                r="24"
-                fill="transparent"
-                style={{ cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}
-                onPointerDown={(event) => {
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                    draggingRef.current = true;
-                    setDragging(true);
-                }}
-                onPointerMove={handlePointerMove}
-                onPointerUp={() => {
-                    draggingRef.current = false;
-                    setDragging(false);
-                }}
-                onPointerCancel={() => {
-                    draggingRef.current = false;
-                    setDragging(false);
-                }}
-                onPointerEnter={() => setHovered(true)}
-                onPointerLeave={() => setHovered(false)}
-            />
-
-            {/* The answer being built, as a fraction. */}
-            <text x="250" y="72" fontSize="11" fill={INK_STRUCTURE}>
+            {/* The answer template — two boxes waiting for tiles. */}
+            <text x="330" y="48" fontSize="11" fill={INK_STRUCTURE}>
                 your answer
             </text>
-            <Term x={330} y={106} power={chosenPower} fontSize={22} fill={ACCENT} />
-            <line x1="296" y1="118" x2="364" y2="118" stroke={ACCENT} strokeWidth="2" strokeLinecap="round" />
-            <text
-                x="330"
-                y="146"
-                fontSize="22"
-                fill={ACCENT}
-                textAnchor="middle"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-                {divisor}
+            <text x="392" y="112" fontSize="30" fill={ACCENT} textAnchor="middle" fontStyle="italic">
+                x
             </text>
-
-            {/* The live check: differentiate what they built. */}
-            <text x="250" y="192" fontSize="11" fill={INK_STRUCTURE}>
-                differentiate it and you get
-            </text>
-            <Term
-                x={330}
-                y={224}
-                coefficient={checkCoefficient}
-                power={checkPower}
-                fontSize={20}
-                fill={backAtStart ? ACCENT : INK}
+            {renderSlot(POWER_SLOT, powerBox, "assemblePower")}
+            <line
+                x1={FRACTION_BAR.x1}
+                y1={FRACTION_BAR.y}
+                x2={FRACTION_BAR.x2}
+                y2={FRACTION_BAR.y}
+                stroke={ACCENT}
+                strokeWidth="2.5"
+                strokeLinecap="round"
             />
+            {renderSlot(DIVISOR_SLOT, divisorBox, "assembleDivisor")}
+
+            {/* The live check — differentiate whatever has been assembled. */}
+            <text x="40" y="204" fontSize="11" fill={INK_STRUCTURE}>
+                differentiate your answer and you get
+            </text>
+            {bothFilled ? (
+                <Term
+                    x={330}
+                    y={208}
+                    coefficient={checkCoefficient}
+                    power={checkPower}
+                    fontSize={22}
+                    fill={backAtStart ? ACCENT : INK}
+                />
+            ) : (
+                <text x={330} y={208} fontSize="14" fill={INK_QUIET} textAnchor="middle">
+                    both boxes still empty
+                </text>
+            )}
             <text
                 x="330"
-                y="256"
+                y="234"
                 fontSize="13"
                 fill={backAtStart ? ACCENT : INK_STRUCTURE}
                 textAnchor="middle"
                 style={{ transition: "fill 150ms ease" }}
             >
-                {backAtStart ? "back to the given term" : "not the given term yet"}
+                {backAtStart
+                    ? "back to the given term"
+                    : bothFilled
+                      ? "not the given term yet"
+                      : ""}
             </text>
 
-            <DivisorDial value={divisor} onChange={(next) => setVar("ladderDivisor", next)} />
+            {/* The tray. */}
+            <text x="40" y="252" fontSize="11" fill={INK_STRUCTURE}>
+                drag a number into each box
+            </text>
+            {TILE_VALUES.map((value, index) => (
+                <NumberTile
+                    key={value}
+                    value={value}
+                    index={index}
+                    dragging={drag?.value === value}
+                    onDrop={handleDrop}
+                    onDragStart={(tileValue, point) => setDrag({ value: tileValue, x: point.x, y: point.y })}
+                    onDragMove={(point) => setDrag((current) => (current ? { ...current, x: point.x, y: point.y } : current))}
+                    onDragEnd={() => setDrag(null)}
+                />
+            ))}
+
+            {/* The tile currently in the student's hand. */}
+            {drag ? (
+                <g transform={`translate(${drag.x} ${drag.y})`} pointerEvents="none">
+                    <rect
+                        x={-TILE_SIZE / 2}
+                        y={-TILE_SIZE / 2}
+                        width={TILE_SIZE}
+                        height={TILE_SIZE}
+                        rx="9"
+                        fill="#FFFFFF"
+                        stroke={ACCENT}
+                        strokeWidth="2.5"
+                        filter="url(#tile-shadow)"
+                    />
+                    <text
+                        x="0"
+                        y="6"
+                        fontSize="18"
+                        fill={ACCENT}
+                        textAnchor="middle"
+                        style={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                        {drag.value}
+                    </text>
+                </g>
+            ) : null}
         </svg>
     );
 }
 
-function PowerLadderFigure() {
+function AnswerBuilderFigure() {
     const setVar = useSetVar();
     return (
         <Figure
-            id="power-ladder"
+            id="integral-answer-builder"
             onReset={() => {
-                setVar("ladderChosenPower", DEFAULT_CHOSEN);
-                setVar("ladderDivisor", DEFAULT_DIVISOR);
+                setVar("assemblePower", 0);
+                setVar("assembleDivisor", 0);
             }}
-            caption="Drag the teal token to the rung your answer belongs on, then drag the divide-by dial. The panel differentiates your answer as you go."
+            caption="Drag a number tile into each teal box, and tap a filled box to empty it again. The panel differentiates whatever you build."
         >
-            <PowerLadderDrawing />
+            <AnswerBuilderDrawing />
             <InteractionHintSequence
-                hintKey="power-ladder-build"
+                hintKey="integral-answer-builder-tiles"
                 steps={[
                     {
-                        gesture: "drag-vertical",
-                        label: "Drag the teal token to another rung",
-                        position: { x: "30%", y: "31%" },
-                        dragPath: {
-                            type: "line",
-                            startOffset: { x: 0, y: -24 },
-                            endOffset: { x: 0, y: 24 },
-                        },
+                        gesture: "drag",
+                        label: "Drag a number tile up into the top box",
+                        position: { x: "59%", y: "78%" },
+                        dragPath: { type: "line", startOffset: { x: 0, y: 18 }, endOffset: { x: 0, y: -22 } },
                     },
                     {
-                        gesture: "drag-horizontal",
-                        label: "Now drag the divide-by dial",
-                        position: { x: "67%", y: "89%" },
-                        dragPath: {
-                            type: "line",
-                            startOffset: { x: -26, y: 0 },
-                            endOffset: { x: 26, y: 0 },
-                        },
+                        gesture: "drag",
+                        label: "Now fill the box under the line",
+                        position: { x: "31%", y: "78%" },
+                        dragPath: { type: "line", startOffset: { x: 0, y: 18 }, endOffset: { x: 0, y: -22 } },
                     },
                 ]}
             />
@@ -413,31 +421,31 @@ export const powerLadderBlocks: ReactElement[] = [
     <StackLayout key="layout-power-ladder-setup" maxWidth="xl">
         <Block id="power-ladder-setup" padding="sm">
             <EditableParagraph id="para-power-ladder-setup" blockId="power-ladder-setup">
-                Every power of x gets its own rung on this ladder, and the term you are
-                integrating is x to the power{" "}
+                An integral answer has two blanks in it: a new power, and a number to divide
+                by. The term waiting to be integrated is x to the power{" "}
                 <InlineScrubbleNumber
                     varName="ladderStartPower"
                     {...numberPropsFromDefinition(getVariableInfo('ladderStartPower'))}
                 />
-                . Drag the teal token to the rung you think the answer lives on, then drag
-                the divide-by dial until differentiating your answer lands you back on the
-                given term.
+                . Drag number tiles into the two teal boxes, and the panel underneath
+                differentiates whatever you build, so you can see whether it lands back on
+                the given term.
             </EditableParagraph>
         </Block>
     </StackLayout>,
 
     <StackLayout key="layout-power-ladder-figure" maxWidth="xl">
         <Block id="power-ladder-figure" padding="sm" hasVisualization>
-            <PowerLadderFigure />
+            <AnswerBuilderFigure />
         </Block>
     </StackLayout>,
 
     <StackLayout key="layout-power-ladder-worked" maxWidth="xl">
         <Block id="power-ladder-worked" padding="sm">
             <EditableParagraph id="para-power-ladder-worked" blockId="power-ladder-worked">
-                Take x³ as the given term. Step up one rung to x⁴, then divide by that new
-                power, 4, giving x⁴ over 4. Differentiate that and the fours cancel, leaving
-                x³ exactly as it started.
+                Take x³ as the given term. The power box goes up one to 4, and the divide-by
+                box takes that same 4, giving x⁴ over 4. Differentiate that and the fours
+                cancel, leaving x³ exactly as it started.
             </EditableParagraph>
         </Block>
     </StackLayout>,
@@ -455,37 +463,37 @@ export const powerLadderBlocks: ReactElement[] = [
     <StackLayout key="layout-power-ladder-question-power" maxWidth="xl">
         <Block id="power-ladder-question-power" padding="md">
             <EditableParagraph id="para-power-ladder-question-power" blockId="power-ladder-question-power">
-                Try it on x⁵. Integrating pushes the power up to{" "}
+                Try it on x⁵. The tile that belongs in the power box is{" "}
                 <InlineFeedback
                     varName="answer_ladder_power"
                     correctValue={["6", "six"]}
                     position="terminal"
-                    successMessage="— yes, one step up the ladder from 5"
+                    successMessage="— yes, one step up from 5"
                     failureMessage="— not that one."
-                    hint="Integrating always climbs the ladder by exactly one rung"
+                    hint="Integrating always pushes the power up by exactly one"
                     visualizationHint={{
                         blockId: "power-ladder-figure",
-                        hintKey: "power-ladder-discover",
-                        label: "Work it out on the ladder",
+                        hintKey: "answer-builder-discover",
+                        label: "Build it and check",
                         steps: [
                             {
-                                gesture: "drag-vertical",
-                                label: "Drag the teal token up until differentiating gives back x⁵",
-                                position: { x: "30%", y: "45%" },
-                                completionVar: "ladderChosenPower",
+                                gesture: "drag",
+                                label: "Drag tiles into the boxes until differentiating gives back x⁵",
+                                position: { x: "86%", y: "78%" },
+                                completionVar: "assemblePower",
                                 completionValue: 6,
                                 completionTolerance: 0.4,
                             },
                             {
-                                gesture: "drag-horizontal",
-                                label: "Now drag the divide-by dial until the panel says you are back on the given term",
-                                position: { x: "67%", y: "89%" },
-                                completionVar: "ladderDivisor",
+                                gesture: "drag",
+                                label: "Now fill the lower box until the panel says you are back on the given term",
+                                position: { x: "86%", y: "78%" },
+                                completionVar: "assembleDivisor",
                                 completionValue: 6,
                                 completionTolerance: 0.4,
                             },
                         ],
-                        resetVars: { ladderStartPower: 5, ladderChosenPower: 4, ladderDivisor: 1 },
+                        resetVars: { ladderStartPower: 5, assemblePower: 0, assembleDivisor: 0 },
                     }}
                 >
                     <InlineClozeInput

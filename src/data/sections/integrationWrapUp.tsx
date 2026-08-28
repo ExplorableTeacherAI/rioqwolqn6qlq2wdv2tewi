@@ -21,8 +21,8 @@ export const integrationWrapUpBlocks: ReactElement[] = [
         <Block id="integration-wrapup-recap" padding="sm">
             <EditableParagraph id="para-integration-wrapup-recap" blockId="integration-wrapup-recap">
                 You can now answer the machine's backwards question. Given a derivative,
-                climb one rung up the power ladder, divide by the power you land on, and add
-                a constant, because every suspect you stamped on the board carried the same
+                push the power up by one, divide by the power you land on, and add a
+                constant, because every suspect you stamped on the board carried the same
                 steepness. Differentiating and integrating are the same road travelled in
                 opposite directions.
             </EditableParagraph>
