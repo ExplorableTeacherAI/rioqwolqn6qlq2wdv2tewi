@@ -169,14 +169,21 @@ export const variableDefinitions: Record<string, VariableDefinition> = {
     // ─────────────────────────────────────────
     // SECTION 4 — The Family of Curves
     // ─────────────────────────────────────────
-    familyShift: {
-        defaultValue: 0,
+    familyStamps: {
+        defaultValue: '0',
+        type: 'text',
+        label: 'Stamped curves',
+        description: 'Comma separated list of the constants C the student has stamped on the board',
+        color: '#62D0AD',
+    },
+    familyStampCount: {
+        defaultValue: 1,
         type: 'number',
-        label: 'Constant C',
-        description: 'How far the curve y = x^2 + C is shifted up or down',
-        min: -2,
-        max: 3,
-        step: 0.5,
+        label: 'Curves on the board',
+        description: 'How many candidate curves the student has stamped',
+        min: 1,
+        max: 12,
+        step: 1,
         color: '#62D0AD',
     },
     familyX: {
