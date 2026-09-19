@@ -14,16 +14,22 @@ import {
     EditableParagraph,
     InlineClozeInput,
     InlineFeedback,
+    InlineFormula,
     InlineScrubbleNumber,
+    InlineSpotColor,
+    InlineTooltip,
+    InlineTrigger,
     InteractionHintSequence,
 } from "@/components/atoms";
-import { Figure } from "@/components/molecules";
+import { Figure, FormulaBlock } from "@/components/molecules";
 import { useVar, useSetVar } from "@/stores";
 import { clamp, remap, useSpring, type Vec2 } from "@/lib/motion";
 import {
     clozePropsFromDefinition,
     getVariableInfo,
     numberPropsFromDefinition,
+    scrubVarsFromDefinitions,
+    spotColorPropsFromDefinition,
 } from "../variables";
 
 // ── Domain model ─────────────────────────────────────────────────────────────
@@ -50,7 +56,10 @@ const POWER_TRACK_Y = 284;
 const INK = "#334155";
 const INK_STRUCTURE = "#64748B";
 const INK_QUIET = "#CBD5E1";
-const ACCENT = "#62D0AD";
+const ACCENT = "#62D0AD"; // the function the student builds
+const GIVEN = "#8E90F5"; // the derivative they are aiming for
+const COEFFICIENT_HUE = "#F8A0CD"; // the coefficient dial and the number it sets
+const POWER_HUE = "#F7B23B"; // the power dial and the exponent it sets
 
 // ── Term rendering (a single algebraic term as SVG text) ─────────────────────
 
@@ -61,6 +70,8 @@ function Term({
     power,
     fontSize,
     fill,
+    coefficientFill,
+    powerFill,
 }: {
     x: number;
     y: number;
@@ -68,20 +79,24 @@ function Term({
     power: number;
     fontSize: number;
     fill: string;
+    /** Optional hue for the coefficient alone (defaults to `fill`). */
+    coefficientFill?: string;
+    /** Optional hue for the exponent alone (defaults to `fill`). */
+    powerFill?: string;
 }) {
     if (power === 0) {
         return (
-            <text x={x} y={y} fontSize={fontSize} fill={fill} textAnchor="middle">
+            <text x={x} y={y} fontSize={fontSize} fill={coefficientFill ?? fill} textAnchor="middle">
                 {coefficient}
             </text>
         );
     }
     return (
         <text x={x} y={y} fontSize={fontSize} fill={fill} textAnchor="middle">
-            {coefficient === 1 ? "" : coefficient}
+            {coefficient === 1 ? null : <tspan fill={coefficientFill ?? fill}>{coefficient}</tspan>}
             <tspan fontStyle="italic">x</tspan>
             {power !== 1 ? (
-                <tspan dy={-fontSize * 0.42} fontSize={fontSize * 0.62}>
+                <tspan dy={-fontSize * 0.42} fontSize={fontSize * 0.62} fill={powerFill ?? fill}>
                     {power}
                 </tspan>
             ) : null}
@@ -97,6 +112,7 @@ function Dial({
     min,
     max,
     trackY,
+    color,
     onChange,
 }: {
     label: string;
@@ -104,6 +120,7 @@ function Dial({
     min: number;
     max: number;
     trackY: number;
+    color: string;
     onChange: (next: number) => void;
 }) {
     const [dragging, setDragging] = useState(false);
@@ -139,7 +156,7 @@ function Dial({
                 x={TRACK_RIGHT}
                 y={trackY - 18}
                 fontSize="12"
-                fill={ACCENT}
+                fill={color}
                 textAnchor="end"
                 style={{ fontVariantNumeric: "tabular-nums" }}
             >
@@ -155,7 +172,7 @@ function Dial({
                 strokeLinecap="round"
             />
             <g transform={`translate(${knobX} ${trackY}) scale(${knobScale})`}>
-                <circle r="11" fill={ACCENT} filter="url(#undo-machine-shadow)" />
+                <circle r="11" fill={color} filter="url(#undo-machine-shadow)" />
             </g>
             <rect
                 ref={rectRef}
@@ -232,14 +249,23 @@ function UndoMachineDrawing() {
             <text x="410" y="44" fontSize="10" fill={INK_STRUCTURE} textAnchor="middle">
                 target
             </text>
-            <Term x={410} y={72} coefficient={TARGET_COEFFICIENT} power={TARGET_POWER} fontSize={20} fill={INK} />
+            <Term x={410} y={72} coefficient={TARGET_COEFFICIENT} power={TARGET_POWER} fontSize={20} fill={GIVEN} />
 
             {/* Input card — what the student builds. Accent: it is manipulable. */}
             <text x="125" y="88" fontSize="11" fill={INK_STRUCTURE} textAnchor="middle">
                 your function
             </text>
             <rect x="40" y="96" width="170" height="76" rx="10" fill="#FFFFFF" stroke={ACCENT} strokeWidth="2.5" />
-            <Term x={125} y={142} coefficient={coefficient} power={power} fontSize={26} fill={ACCENT} />
+            <Term
+                x={125}
+                y={142}
+                coefficient={coefficient}
+                power={power}
+                fontSize={26}
+                fill={ACCENT}
+                coefficientFill={COEFFICIENT_HUE}
+                powerFill={POWER_HUE}
+            />
 
             {/* The machine: one arrow that only knows how to differentiate. */}
             <text x="255" y="118" fontSize="11" fill={INK_STRUCTURE} textAnchor="middle">
@@ -273,6 +299,7 @@ function UndoMachineDrawing() {
                 min={MIN_COEFFICIENT}
                 max={MAX_COEFFICIENT}
                 trackY={COEFFICIENT_TRACK_Y}
+                color={COEFFICIENT_HUE}
                 onChange={(next) => setVar("undoCoefficient", next)}
             />
             <Dial
@@ -281,6 +308,7 @@ function UndoMachineDrawing() {
                 min={MIN_POWER}
                 max={MAX_POWER}
                 trackY={POWER_TRACK_Y}
+                color={POWER_HUE}
                 onChange={(next) => setVar("undoPower", next)}
             />
         </svg>
@@ -296,7 +324,7 @@ function UndoMachineFigure() {
                 setVar("undoCoefficient", DEFAULT_COEFFICIENT);
                 setVar("undoPower", DEFAULT_POWER);
             }}
-            caption="The machine differentiates whatever you build. Drag the two teal dials until its print-out matches the dashed target."
+            caption="The machine differentiates whatever you build. Drag the rose and amber dials until its print-out matches the dashed target."
         >
             <UndoMachineDrawing />
             <InteractionHintSequence
@@ -318,6 +346,34 @@ function UndoMachineFigure() {
     );
 }
 
+// The machine's one trick written in notation. The coefficient and the power are
+// the same two store variables the dials drive, so scrubbing either number here
+// turns the matching dial, and the right-hand side is the machine's print-out.
+function UndoMachineFormula() {
+    const coefficient = useVar<number>("undoCoefficient", DEFAULT_COEFFICIENT);
+    const power = useVar<number>("undoPower", DEFAULT_POWER);
+
+    const outputCoefficient = coefficient * power;
+    const outputPower = power - 1;
+    const matches =
+        outputCoefficient === TARGET_COEFFICIENT && outputPower === TARGET_POWER;
+    const printed =
+        outputPower === 0
+            ? `${outputCoefficient}`
+            : outputPower === 1
+              ? `${outputCoefficient}x`
+              : `${outputCoefficient}x^${outputPower}`; // single-digit power: \clr content must stay brace-free
+
+    return (
+        <FormulaBlock
+            latex={`\\frac{d}{dx}\\left(\\scrub{undoCoefficient}\\,\\clr{fn}{x}^{\\scrub{undoPower}}\\right) = \\clr{printed}{${printed}}`}
+            colorMap={{ fn: ACCENT, printed: matches ? ACCENT : INK }}
+            variables={scrubVarsFromDefinitions(["undoCoefficient", "undoPower"])}
+            color={INK}
+        />
+    );
+}
+
 // ── Blocks ───────────────────────────────────────────────────────────────────
 
 export const undoMachineBlocks: ReactElement[] = [
@@ -333,7 +389,7 @@ export const undoMachineBlocks: ReactElement[] = [
         <Block id="undo-machine-setup" padding="sm">
             <EditableParagraph id="para-undo-machine-setup" blockId="undo-machine-setup">
                 This machine only knows one trick: whatever function goes in, its derivative
-                comes out. Drag the two teal dials to build a function with coefficient{" "}
+                comes out. Drag the two dials to build a function with coefficient{" "}
                 <InlineScrubbleNumber
                     varName="undoCoefficient"
                     {...numberPropsFromDefinition(getVariableInfo('undoCoefficient'))}
@@ -343,7 +399,13 @@ export const undoMachineBlocks: ReactElement[] = [
                     varName="undoPower"
                     {...numberPropsFromDefinition(getVariableInfo('undoPower'))}
                 />
-                , and hunt for the pair that makes the machine print exactly 6x².
+                , and hunt for the pair that makes the machine print exactly{" "}
+                <InlineFormula
+                    id="formula-undo-machine-setup-target"
+                    latex="\clr{target}{6x^2}"
+                    colorMap={{ target: GIVEN }}
+                />
+                .
             </EditableParagraph>
         </Block>
     </StackLayout>,
@@ -354,12 +416,61 @@ export const undoMachineBlocks: ReactElement[] = [
         </Block>
     </StackLayout>,
 
+    <StackLayout key="layout-undo-machine-formula" maxWidth="xl">
+        <Block id="undo-machine-formula" padding="md">
+            <UndoMachineFormula />
+        </Block>
+    </StackLayout>,
+
     <StackLayout key="layout-undo-machine-insight" maxWidth="xl">
         <Block id="undo-machine-insight" padding="sm">
             <EditableParagraph id="para-undo-machine-insight" blockId="undo-machine-insight">
-                Finding those dials means you have integrated: you started from a derivative
-                and recovered the function behind it. The power you needed sat one step above
-                the target's power, and the coefficient came out smaller, not bigger. Those
+                Finding those dials means you have{" "}
+                <InlineTooltip
+                    id="tooltip-undo-machine-integrated"
+                    tooltip="Integrating means working backwards from a derivative to a function it could have come from."
+                    color="#2563EB"
+                    bgColor="rgba(37, 99, 235, 0.12)"
+                >
+                    integrated
+                </InlineTooltip>
+                : you started from a derivative
+                and recovered the function behind it. The{" "}
+                <InlineSpotColor
+                    id="spot-undo-machine-insight-power"
+                    varName="undoPower"
+                    {...spotColorPropsFromDefinition(getVariableInfo('undoPower'))}
+                >
+                    power
+                </InlineSpotColor>{" "}
+                you needed sat{" "}
+                <InlineTrigger
+                    id="trigger-undo-machine-power-up"
+                    varName="undoPower"
+                    value={3}
+                    color={POWER_HUE}
+                    bgColor="rgba(247, 178, 59, 0.18)"
+                >
+                    one step above
+                </InlineTrigger>{" "}
+                the target's power, and the{" "}
+                <InlineSpotColor
+                    id="spot-undo-machine-insight-coefficient"
+                    varName="undoCoefficient"
+                    {...spotColorPropsFromDefinition(getVariableInfo('undoCoefficient'))}
+                >
+                    coefficient
+                </InlineSpotColor>{" "}
+                <InlineTrigger
+                    id="trigger-undo-machine-coefficient-down"
+                    varName="undoCoefficient"
+                    value={2}
+                    color={COEFFICIENT_HUE}
+                    bgColor="rgba(248, 160, 205, 0.2)"
+                >
+                    came out smaller
+                </InlineTrigger>
+                , not bigger. Those
                 two moves are the whole recipe.
             </EditableParagraph>
         </Block>
@@ -368,7 +479,13 @@ export const undoMachineBlocks: ReactElement[] = [
     <StackLayout key="layout-undo-machine-question" maxWidth="xl">
         <Block id="undo-machine-question" padding="md">
             <EditableParagraph id="para-undo-machine-question" blockId="undo-machine-question">
-                Same machine, new day. Today it prints 5x⁴, so the function you fed it was{" "}
+                Same machine, new day. Today it prints{" "}
+                <InlineFormula
+                    id="formula-undo-machine-question-printed"
+                    latex="\clr{target}{5x^4}"
+                    colorMap={{ target: GIVEN }}
+                />
+                , so the function you fed it was{" "}
                 <InlineFeedback
                     varName="answer_undo_reverse"
                     correctValue={["x^5", "x⁵", "x5"]}

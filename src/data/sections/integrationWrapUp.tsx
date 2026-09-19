@@ -6,7 +6,8 @@
 import { type ReactElement } from "react";
 import { StackLayout } from "@/components/layouts";
 import { Block } from "@/components/templates";
-import { EditableH2, EditableParagraph } from "@/components/atoms";
+import { EditableH2, EditableParagraph, InlineSpotColor } from "@/components/atoms";
+import { getVariableInfo, spotColorPropsFromDefinition } from "../variables";
 
 export const integrationWrapUpBlocks: ReactElement[] = [
     <StackLayout key="layout-integration-wrapup-heading" maxWidth="xl">
@@ -21,9 +22,40 @@ export const integrationWrapUpBlocks: ReactElement[] = [
         <Block id="integration-wrapup-recap" padding="sm">
             <EditableParagraph id="para-integration-wrapup-recap" blockId="integration-wrapup-recap">
                 You can now answer the machine's backwards question. Given a derivative,
-                push the power up by one, divide by the power you land on, and add a
-                constant, because every suspect you stamped on the board carried the same
-                steepness. Differentiating and integrating are the same road travelled in
+                push the{" "}
+                <InlineSpotColor
+                    id="spot-integration-wrapup-power"
+                    varName="assemblePower"
+                    {...spotColorPropsFromDefinition(getVariableInfo('assemblePower'))}
+                >
+                    power
+                </InlineSpotColor>{" "}
+                up by one,{" "}
+                <InlineSpotColor
+                    id="spot-integration-wrapup-divisor"
+                    varName="assembleDivisor"
+                    {...spotColorPropsFromDefinition(getVariableInfo('assembleDivisor'))}
+                >
+                    divide by
+                </InlineSpotColor>{" "}
+                the power you land on, and add a
+                constant, because every{" "}
+                <InlineSpotColor
+                    id="spot-integration-wrapup-curves"
+                    varName="familyStamps"
+                    {...spotColorPropsFromDefinition(getVariableInfo('familyStamps'))}
+                >
+                    suspect
+                </InlineSpotColor>{" "}
+                you stamped on the board carried the same{" "}
+                <InlineSpotColor
+                    id="spot-integration-wrapup-steepness"
+                    varName="familyX"
+                    {...spotColorPropsFromDefinition(getVariableInfo('familyX'))}
+                >
+                    steepness
+                </InlineSpotColor>
+                . Differentiating and integrating are the same road travelled in
                 opposite directions.
             </EditableParagraph>
         </Block>

@@ -16,8 +16,11 @@ import {
     InlineClozeChoice,
     InlineClozeInput,
     InlineFeedback,
+    InlineFormula,
     InlineLinkedHighlight,
     InlineScrubbleNumber,
+    InlineTooltip,
+    InlineTrigger,
     InteractionHintSequence,
 } from "@/components/atoms";
 import { Figure } from "@/components/molecules";
@@ -369,14 +372,35 @@ export const familyOfCurvesBlocks: ReactElement[] = [
     <StackLayout key="layout-family-setup" maxWidth="xl">
         <Block id="family-setup" padding="sm">
             <EditableParagraph id="para-family-setup" blockId="family-setup">
-                A curve has gone missing and the only clue left behind is its derivative, 2x.
-                One suspect, x², is already on the board. Click anywhere to stamp another
-                curve you think fits the clue, then drag the dashed line to compare every
+                A curve has gone missing and the only clue left behind is its derivative,{" "}
+                <InlineFormula
+                    id="formula-family-setup-clue"
+                    latex="\clr{slope}{2x}"
+                    colorMap={{ slope: PARTNER }}
+                />
+                . One suspect,{" "}
+                <InlineFormula
+                    id="formula-family-setup-suspect"
+                    latex="\clr{curve}{x^2}"
+                    colorMap={{ curve: ACCENT }}
+                />
+                , is already on the board. Click anywhere to stamp another{" "}
+                <InlineLinkedHighlight
+                    id="link-family-setup-curves"
+                    varName="familyHighlight"
+                    highlightId="curves"
+                    {...linkedHighlightPropsFromDefinition(getVariableInfo('familyHighlight'))}
+                >
+                    curve
+                </InlineLinkedHighlight>{" "}
+                you think fits the clue, then drag the dashed line to compare every
                 suspect's{" "}
                 <InlineLinkedHighlight
                     varName="familyHighlight"
                     highlightId="steepness"
                     {...linkedHighlightPropsFromDefinition(getVariableInfo('familyHighlight'))}
+                    color={PARTNER}
+                    bgColor="rgba(142, 144, 245, 0.22)"
                 >
                     steepness
                 </InlineLinkedHighlight>{" "}
@@ -401,8 +425,28 @@ export const familyOfCurvesBlocks: ReactElement[] = [
         <Block id="family-insight" padding="sm">
             <EditableParagraph id="para-family-insight" blockId="family-insight">
                 Every suspect fits, and their steepness bars stay stubbornly parallel. Sliding
-                a curve up or down never changes how steep it is, so the clue 2x can only
-                narrow things down to x² plus some constant. We write that constant as C, and
+                a curve up or down never changes how steep it is, so the clue{" "}
+                <InlineFormula
+                    id="formula-family-insight-clue"
+                    latex="\clr{slope}{2x}"
+                    colorMap={{ slope: PARTNER }}
+                />{" "}
+                can only narrow things down to{" "}
+                <InlineFormula
+                    id="formula-family-insight-curve"
+                    latex="\clr{curve}{x^2}"
+                    colorMap={{ curve: ACCENT }}
+                />{" "}
+                plus some{" "}
+                <InlineTooltip
+                    id="tooltip-family-insight-constant"
+                    tooltip="A constant is a fixed number, such as 2 or -1.5, that stays the same whatever x is."
+                    color="#2563EB"
+                    bgColor="rgba(37, 99, 235, 0.12)"
+                >
+                    constant
+                </InlineTooltip>
+                . We write that constant as C, and
                 it stands for the whole board at once.
             </EditableParagraph>
         </Block>
@@ -411,7 +455,25 @@ export const familyOfCurvesBlocks: ReactElement[] = [
     <StackLayout key="layout-family-question-both" maxWidth="xl">
         <Block id="family-question-both" padding="md">
             <EditableParagraph id="para-family-question-both" blockId="family-question-both">
-                Maya integrates 2x and writes x², while Theo writes x² + 2. Checking their
+                Maya integrates{" "}
+                <InlineFormula
+                    id="formula-family-question-both-given"
+                    latex="\clr{slope}{2x}"
+                    colorMap={{ slope: PARTNER }}
+                />{" "}
+                and writes{" "}
+                <InlineFormula
+                    id="formula-family-question-both-maya"
+                    latex="\clr{curve}{x^2}"
+                    colorMap={{ curve: ACCENT }}
+                />
+                , while Theo writes{" "}
+                <InlineFormula
+                    id="formula-family-question-both-theo"
+                    latex="\clr{curve}{x^2 + 2}"
+                    colorMap={{ curve: ACCENT }}
+                />
+                . Checking their
                 answers by differentiating,{" "}
                 <InlineFeedback
                     varName="answer_family_constant"
@@ -459,8 +521,17 @@ export const familyOfCurvesBlocks: ReactElement[] = [
     <StackLayout key="layout-family-question-origin" maxWidth="xl">
         <Block id="family-question-origin" padding="md">
             <EditableParagraph id="para-family-question-origin" blockId="family-question-origin">
-                Out of that whole board of suspects, exactly one curve passes through the
-                origin. For that single curve, C must be{" "}
+                Out of that whole board of suspects, exactly one curve passes through{" "}
+                <InlineTrigger
+                    id="trigger-family-question-origin"
+                    varName="familyX"
+                    value={0}
+                    color={PARTNER}
+                    bgColor="rgba(142, 144, 245, 0.18)"
+                >
+                    the origin
+                </InlineTrigger>
+                . For that single curve, C must be{" "}
                 <InlineFeedback
                     varName="answer_family_origin"
                     correctValue={["0", "zero"]}

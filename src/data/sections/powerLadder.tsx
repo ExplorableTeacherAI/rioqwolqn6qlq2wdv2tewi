@@ -15,7 +15,10 @@ import {
     EditableParagraph,
     InlineClozeInput,
     InlineFeedback,
+    InlineFormula,
     InlineScrubbleNumber,
+    InlineSpotColor,
+    InlineTrigger,
     InteractionHintSequence,
 } from "@/components/atoms";
 import { Figure, FormulaBlock } from "@/components/molecules";
@@ -25,6 +28,7 @@ import {
     clozePropsFromDefinition,
     getVariableInfo,
     numberPropsFromDefinition,
+    spotColorPropsFromDefinition,
 } from "../variables";
 
 // ── Domain model ─────────────────────────────────────────────────────────────
@@ -48,8 +52,11 @@ const formatRatio = (numerator: number, denominator: number): string => {
 const VIEW_WIDTH = 560;
 const VIEW_HEIGHT = 360;
 
-const POWER_SLOT = { x: 412, y: 74, size: 32 };
-const DIVISOR_SLOT = { x: 404, y: 136, size: 32 };
+const POWER_HUE = "#F7B23B"; // the new power (same amber as the power dial)
+const DIVISOR_HUE = "#F8A0CD"; // the number you divide by (same rose as the coefficient dial)
+
+const POWER_SLOT = { x: 412, y: 74, size: 32, hue: POWER_HUE, tint: "rgba(247, 178, 59, 0.18)" };
+const DIVISOR_SLOT = { x: 404, y: 136, size: 32, hue: DIVISOR_HUE, tint: "rgba(248, 160, 205, 0.2)" };
 const FRACTION_BAR = { x1: 374, x2: 458, y: 124 };
 
 const TILE_SIZE = 40;
@@ -219,7 +226,7 @@ function AnswerBuilderDrawing() {
     };
 
     const renderSlot = (
-        slot: { x: number; y: number; size: number },
+        slot: { x: number; y: number; size: number; hue: string; tint: string },
         value: number,
         varName: string,
     ) => (
@@ -230,8 +237,8 @@ function AnswerBuilderDrawing() {
                 width={slot.size}
                 height={slot.size}
                 rx="7"
-                fill={value > 0 ? "rgba(98, 208, 173, 0.15)" : "#FFFFFF"}
-                stroke={ACCENT}
+                fill={value > 0 ? slot.tint : "#FFFFFF"}
+                stroke={slot.hue}
                 strokeWidth={value > 0 ? 2.5 : 1.5}
                 strokeDasharray={value > 0 ? undefined : "4 4"}
                 style={{ transition: "stroke-width 150ms ease", cursor: value > 0 ? "pointer" : "default" }}
@@ -244,7 +251,7 @@ function AnswerBuilderDrawing() {
                     x={slot.x + slot.size / 2}
                     y={slot.y + slot.size / 2 + 7}
                     fontSize="19"
-                    fill={ACCENT}
+                    fill={slot.hue}
                     textAnchor="middle"
                     pointerEvents="none"
                     style={{ fontVariantNumeric: "tabular-nums" }}
@@ -383,7 +390,7 @@ function AnswerBuilderFigure() {
                 setVar("assemblePower", 0);
                 setVar("assembleDivisor", 0);
             }}
-            caption="Drag a number tile into each teal box, and tap a filled box to empty it again. The panel differentiates whatever you build."
+            caption="Drag a number tile into each coloured box, and tap a filled box to empty it again. The panel differentiates whatever you build."
         >
             <AnswerBuilderDrawing />
             <InteractionHintSequence
@@ -421,13 +428,28 @@ export const powerLadderBlocks: ReactElement[] = [
     <StackLayout key="layout-power-ladder-setup" maxWidth="xl">
         <Block id="power-ladder-setup" padding="sm">
             <EditableParagraph id="para-power-ladder-setup" blockId="power-ladder-setup">
-                An integral answer has two blanks in it: a new power, and a number to divide
-                by. The term waiting to be integrated is x to the power{" "}
+                An integral answer has two blanks in it: a{" "}
+                <InlineSpotColor
+                    id="spot-power-ladder-setup-power"
+                    varName="assemblePower"
+                    {...spotColorPropsFromDefinition(getVariableInfo('assemblePower'))}
+                >
+                    new power
+                </InlineSpotColor>
+                , and a{" "}
+                <InlineSpotColor
+                    id="spot-power-ladder-setup-divisor"
+                    varName="assembleDivisor"
+                    {...spotColorPropsFromDefinition(getVariableInfo('assembleDivisor'))}
+                >
+                    number to divide by
+                </InlineSpotColor>
+                . The term waiting to be integrated is x to the power{" "}
                 <InlineScrubbleNumber
                     varName="ladderStartPower"
                     {...numberPropsFromDefinition(getVariableInfo('ladderStartPower'))}
                 />
-                . Drag number tiles into the two teal boxes, and the panel underneath
+                . Drag number tiles into the two coloured boxes, and the panel underneath
                 differentiates whatever you build, so you can see whether it lands back on
                 the given term.
             </EditableParagraph>
@@ -443,9 +465,49 @@ export const powerLadderBlocks: ReactElement[] = [
     <StackLayout key="layout-power-ladder-worked" maxWidth="xl">
         <Block id="power-ladder-worked" padding="sm">
             <EditableParagraph id="para-power-ladder-worked" blockId="power-ladder-worked">
-                Take x³ as the given term. The power box goes up one to 4, and the divide-by
-                box takes that same 4, giving x⁴ over 4. Differentiate that and the fours
-                cancel, leaving x³ exactly as it started.
+                <InlineTrigger
+                    id="trigger-power-ladder-worked-given"
+                    varName="ladderStartPower"
+                    value={3}
+                    color={GIVEN}
+                    bgColor="rgba(142, 144, 245, 0.18)"
+                >
+                    Take x³
+                </InlineTrigger>{" "}
+                as the given term. The power box{" "}
+                <InlineTrigger
+                    id="trigger-power-ladder-worked-power"
+                    varName="assemblePower"
+                    value={4}
+                    color={POWER_HUE}
+                    bgColor="rgba(247, 178, 59, 0.18)"
+                >
+                    goes up one to 4
+                </InlineTrigger>
+                , and the divide-by box{" "}
+                <InlineTrigger
+                    id="trigger-power-ladder-worked-divisor"
+                    varName="assembleDivisor"
+                    value={4}
+                    color={DIVISOR_HUE}
+                    bgColor="rgba(248, 160, 205, 0.2)"
+                >
+                    takes that same 4
+                </InlineTrigger>
+                , giving{" "}
+                <InlineFormula
+                    id="formula-power-ladder-worked-answer"
+                    latex="\frac{\clr{built}{x}^{\clr{power}{4}}}{\clr{divisor}{4}}"
+                    colorMap={{ built: ACCENT, power: POWER_HUE, divisor: DIVISOR_HUE }}
+                />
+                . Differentiate that and the fours
+                cancel, leaving{" "}
+                <InlineFormula
+                    id="formula-power-ladder-worked-given"
+                    latex="\clr{given}{x^3}"
+                    colorMap={{ given: GIVEN }}
+                />{" "}
+                exactly as it started.
             </EditableParagraph>
         </Block>
     </StackLayout>,
@@ -453,8 +515,8 @@ export const powerLadderBlocks: ReactElement[] = [
     <StackLayout key="layout-power-ladder-rule" maxWidth="xl">
         <Block id="power-ladder-rule" padding="lg">
             <FormulaBlock
-                latex="\int \clr{given}{x^{n}} \, dx = \frac{\clr{built}{x^{n+1}}}{\clr{built}{n+1}}"
-                colorMap={{ given: "#8E90F5", built: "#62D0AD" }}
+                latex="\int \clr{given}{x^n} \, dx = \frac{\clr{built}{x}^{\clr{power}{n+1}}}{\clr{divisor}{n+1}}"
+                colorMap={{ given: GIVEN, built: ACCENT, power: POWER_HUE, divisor: DIVISOR_HUE }}
                 color="#334155"
             />
         </Block>
@@ -463,7 +525,13 @@ export const powerLadderBlocks: ReactElement[] = [
     <StackLayout key="layout-power-ladder-question-power" maxWidth="xl">
         <Block id="power-ladder-question-power" padding="md">
             <EditableParagraph id="para-power-ladder-question-power" blockId="power-ladder-question-power">
-                Try it on x⁵. The tile that belongs in the power box is{" "}
+                Try it on{" "}
+                <InlineFormula
+                    id="formula-power-ladder-question-given"
+                    latex="\clr{given}{x^5}"
+                    colorMap={{ given: GIVEN }}
+                />
+                . The tile that belongs in the power box is{" "}
                 <InlineFeedback
                     varName="answer_ladder_power"
                     correctValue={["6", "six"]}

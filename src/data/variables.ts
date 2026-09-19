@@ -92,7 +92,7 @@ export const variableDefinitions: Record<string, VariableDefinition> = {
         min: 1,
         max: 6,
         step: 1,
-        color: '#62D0AD',
+        color: '#F8A0CD',
     },
     undoPower: {
         defaultValue: 2,
@@ -102,7 +102,7 @@ export const variableDefinitions: Record<string, VariableDefinition> = {
         min: 1,
         max: 5,
         step: 1,
-        color: '#62D0AD',
+        color: '#F7B23B',
     },
     answer_undo_reverse: {
         defaultValue: '',
@@ -111,7 +111,8 @@ export const variableDefinitions: Record<string, VariableDefinition> = {
         description: 'Student answer for the function that differentiates to 5x^4',
         placeholder: '???',
         correctAnswer: ['x^5', 'x⁵', 'x5'],
-        color: '#8E90F5',
+        color: '#62D0AD',
+        bgColor: 'rgba(98, 208, 173, 0.22)',
     },
 
     // ─────────────────────────────────────────
@@ -135,7 +136,7 @@ export const variableDefinitions: Record<string, VariableDefinition> = {
         min: 0,
         max: 6,
         step: 1,
-        color: '#62D0AD',
+        color: '#F7B23B',
     },
     assembleDivisor: {
         defaultValue: 0,
@@ -145,7 +146,7 @@ export const variableDefinitions: Record<string, VariableDefinition> = {
         min: 0,
         max: 6,
         step: 1,
-        color: '#62D0AD',
+        color: '#F8A0CD',
     },
     answer_ladder_power: {
         defaultValue: '',
@@ -154,7 +155,8 @@ export const variableDefinitions: Record<string, VariableDefinition> = {
         description: 'Student answer for the new power when integrating x to the fifth',
         placeholder: '???',
         correctAnswer: ['6', 'six'],
-        color: '#8E90F5',
+        color: '#F7B23B',
+        bgColor: 'rgba(247, 178, 59, 0.22)',
     },
     answer_ladder_divisor: {
         defaultValue: '',
@@ -163,7 +165,8 @@ export const variableDefinitions: Record<string, VariableDefinition> = {
         description: 'Student answer for the number you divide by when integrating x to the fifth',
         placeholder: '???',
         correctAnswer: ['6', 'six'],
-        color: '#8E90F5',
+        color: '#F8A0CD',
+        bgColor: 'rgba(248, 160, 205, 0.25)',
     },
 
     // ─────────────────────────────────────────
@@ -221,7 +224,8 @@ export const variableDefinitions: Record<string, VariableDefinition> = {
         description: 'Student answer for the value of C when the curve passes through the origin',
         placeholder: '???',
         correctAnswer: ['0', 'zero'],
-        color: '#8E90F5',
+        color: '#62D0AD',
+        bgColor: 'rgba(98, 208, 173, 0.22)',
     },
 
     // Uncomment and modify these examples for your lesson:
